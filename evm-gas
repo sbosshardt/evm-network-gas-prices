@@ -73,27 +73,7 @@ def print_gas_costs(gas_units: float = 1.0, currencies: list = None, json_output
     results = calculate_gas_costs(gas_units, currencies)
     
     if json_output:
-        # Transform the results for JSON output
-        json_results = {}
-        for network, data in results.items():
-            if "error" in data:
-                json_results[network] = {"error": data["error"]}
-                continue
-                
-            json_results[network] = {
-                "gas_price_gwei": data["gas_price_gwei"],
-                "native_token_cost": data["native_token_cost"],
-                "native_token": data["native_token"],
-                "native_token_symbol": data["native_token_symbol"],
-                "gas_units": data["gas_units"],
-                "block_number": data["block_number"],
-                "timestamp": data["timestamp"],
-                "datetime": data["datetime"],
-                "rpc_url": data["rpc_url"],
-                "costs": data["costs"],
-                "token_prices": data["token_prices"]
-            }
-        print(json.dumps(json_results, indent=2))
+        print(json.dumps(results, indent=2))
         return
         
     print(f"\nGas Costs (for {format_number(gas_units)}M gas units):")
@@ -104,21 +84,33 @@ def print_gas_costs(gas_units: float = 1.0, currencies: list = None, json_output
             continue
             
         print(f"{network}:")
-        print(f"  Gas Price: {format_number(data['gas_price_gwei'], 5)} gwei")
-        print(f"  Native Token: {data['native_token']} ({data['native_token_symbol']})")
-        print(f"  Native Token Cost: {format_number(data['native_token_cost'], 8)} {data['native_token_symbol']}")
         
-        # Print costs in each currency
+        # Print gas prices with percentiles
+        print("  Gas Prices (gwei):")
+        print(f"    Low (Bottom 10%): {format_number(data['gas_prices_gwei']['10'], 5)} gwei")
+        print(f"    Medium (Middle 50%): {format_number(data['gas_prices_gwei']['50'], 5)} gwei")
+        print(f"    High (Top 10%): {format_number(data['gas_prices_gwei']['90'], 5)} gwei")
+        
+        print(f"  Native Token: {data['native_token']} ({data['native_token_symbol']})")
+        
+        # Print native token costs with percentiles
+        print("  Native Token Costs:")
+        print(f"    Low (Bottom 10%): {format_number(data['native_token_costs']['10'], 8)} {data['native_token_symbol']}")
+        print(f"    Medium (Middle 50%): {format_number(data['native_token_costs']['50'], 8)} {data['native_token_symbol']}")
+        print(f"    High (Top 10%): {format_number(data['native_token_costs']['90'], 8)} {data['native_token_symbol']}")
+        
+        # Print costs in each currency with percentiles
         for currency in currencies:
             normalized = normalize_currency(currency)
             if normalized == "all":
                 continue
             symbol = get_currency_symbol(currency)
             name = get_currency_name(currency)
-            cost = data["costs"][normalized]
-            price = data["token_prices"][normalized]
-            print(f"  {name} Cost: {symbol}{format_number(cost)}")
-            print(f"  Token Price ({name}): {symbol}{format_number(price)}")
+            print(f"  {name} Costs:")
+            print(f"    Low (Bottom 10%): {symbol}{format_number(data['costs'][normalized]['10'])}")
+            print(f"    Medium (Middle 50%): {symbol}{format_number(data['costs'][normalized]['50'])}")
+            print(f"    High (Top 10%): {symbol}{format_number(data['costs'][normalized]['90'])}")
+            print(f"  Token Price ({name}): {symbol}{format_number(data['token_prices'][normalized])}")
             
         print(f"  Block Number: {format_number(data['block_number'])}")
         print(f"  RPC URL: {data['rpc_url']}")

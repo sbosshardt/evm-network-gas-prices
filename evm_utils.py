@@ -38,17 +38,38 @@ async def fetch_network_data(network: str, gas_units: int, timestamps: Dict[str,
     for endpoint in endpoints:
         try:
             w3 = Web3(Web3.HTTPProvider(endpoint))
-            gas_price = w3.eth.gas_price
-            block_number = w3.eth.block_number
-            total_cost_wei = gas_price * gas_units
-            native_token_cost = wei_to_eth(total_cost_wei)
             
+            # Get fee history with percentiles
+            fee_history = w3.eth.fee_history(
+                block_count=5,
+                newest_block='latest',
+                reward_percentiles=[10, 50, 90]
+            )
+            
+            # Calculate gas prices for each percentile
+            gas_prices_gwei = {}
+            native_token_costs = {}
+            
+            for i, percentile in enumerate([10, 50, 90]):
+                # Calculate total gas price (base fee + priority fee)
+                base_fee = fee_history['baseFeePerGas'][-1]  # Use the latest base fee
+                priority_fee = fee_history['reward'][-1][i]  # Get priority fee for this percentile
+                total_gas_price = base_fee + priority_fee
+                
+                # Convert to gwei and calculate costs
+                gas_price_gwei = float(Web3.from_wei(total_gas_price, 'gwei'))
+                total_cost_wei = total_gas_price * gas_units
+                native_token_cost = wei_to_eth(total_cost_wei)
+                
+                gas_prices_gwei[str(percentile)] = gas_price_gwei
+                native_token_costs[str(percentile)] = native_token_cost
+            
+            block_number = w3.eth.block_number
             network_info = get_network_info(network)
             
             return {
-                "gas_price_gwei": float(Web3.from_wei(gas_price, 'gwei')),
-                "total_cost_wei": total_cost_wei,
-                "native_token_cost": native_token_cost,
+                "gas_prices_gwei": gas_prices_gwei,
+                "native_token_costs": native_token_costs,
                 "native_token": network_info["native_token"],
                 "native_token_symbol": network_info["native_token_symbol"],
                 "gas_units": gas_units,
@@ -148,24 +169,26 @@ async def calculate_gas_costs_async(gas_units: float = 1.0, currencies: List[str
         network_info = get_network_info(network)
         token = network_info["coingecko_id"]
         
-        # Calculate costs in each currency
+        # Calculate costs in each currency for each percentile
         costs = {}
         token_prices = {}
         for currency in currencies:
             # Use lowercase for API data lookup
             token_price = crypto_prices[token][currency.lower()]
-            cost = gas_data["native_token_cost"] * token_price
-            
-            # Use Decimal for more precise calculations
-            cost_decimal = Decimal(str(cost)).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
             token_price_decimal = Decimal(str(token_price)).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
-            
-            costs[currency] = float(cost_decimal)
             token_prices[currency] = float(token_price_decimal)
+            
+            # Calculate costs for each percentile
+            costs[currency] = {}
+            for percentile in ["10", "50", "90"]:
+                native_token_cost = gas_data["native_token_costs"][percentile]
+                cost = native_token_cost * token_price
+                cost_decimal = Decimal(str(cost)).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+                costs[currency][percentile] = float(cost_decimal)
         
         results[network] = {
-            "gas_price_gwei": gas_data["gas_price_gwei"],
-            "native_token_cost": gas_data["native_token_cost"],
+            "gas_prices_gwei": gas_data["gas_prices_gwei"],
+            "native_token_costs": gas_data["native_token_costs"],
             "native_token": gas_data["native_token"],
             "native_token_symbol": gas_data["native_token_symbol"],
             "gas_units": gas_data["gas_units"],
