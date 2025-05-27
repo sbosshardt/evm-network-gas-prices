@@ -2,7 +2,15 @@
 
 import argparse
 import json
-from evm_utils import get_gas_prices, get_crypto_prices, calculate_gas_costs_usd
+from evm_utils import (
+    get_gas_prices, get_crypto_prices, calculate_gas_costs
+)
+from networks import RPC_ENDPOINTS, format_network_help
+from currencies import (
+    SUPPORTED_CURRENCIES, format_currency_help,
+    get_currency_symbol, get_currency_name,
+    normalize_currency
+)
 
 def print_gas_prices(gas_units: float = 1.0, json_output: bool = False):
     """Print gas prices for all networks."""
@@ -20,17 +28,18 @@ def print_gas_prices(gas_units: float = 1.0, json_output: bool = False):
             continue
             
         print(f"{network}:")
-        print(f"  Gas Price: {data['gas_price_gwei']:.2f} gwei")
-        print(f"  Total Cost: {data['native_token_cost']:.8f} ETH")
+        print(f"  Gas Price: {data['gas_price_gwei']:.5f} gwei")
+        print(f"  Total Cost: {data['native_token_cost']:.8f} {data['native_token_symbol']}")
+        print(f"  Native Token: {data['native_token']} ({data['native_token_symbol']})")
         print(f"  Block Number: {data['block_number']}")
         print(f"  RPC URL: {data['rpc_url']}")
         print(f"  Timestamp: {data['timestamp']}")
         print(f"  As of: {data['datetime']}")
         print()
 
-def print_crypto_prices(json_output: bool = False):
+def print_crypto_prices(currencies: list, json_output: bool = False):
     """Print cryptocurrency prices."""
-    results = get_crypto_prices()
+    results = get_crypto_prices(currencies)
     
     if json_output:
         print(json.dumps(results, indent=2))
@@ -46,19 +55,45 @@ def print_crypto_prices(json_output: bool = False):
         if token in ["timestamp", "datetime"]:
             continue
         print(f"{token.upper()}:")
-        print(f"  USD: ${prices['usd']:.2f}")
+        for currency in currencies:
+            symbol = get_currency_symbol(currency)
+            name = get_currency_name(currency)
+            print(f"  {name}: {symbol}{prices[currency]:.5f}")
     print(f"\nTimestamp: {results['timestamp']}")
     print(f"As of: {results['datetime']}")
 
-def print_gas_costs_usd(gas_units: float = 1.0, json_output: bool = False):
-    """Print gas costs in USD for all networks."""
-    results = calculate_gas_costs_usd(gas_units)
+def print_gas_costs(gas_units: float = 1.0, currencies: list = None, json_output: bool = False):
+    """Print gas costs in specified currencies for all networks."""
+    if currencies is None:
+        currencies = ["usd"]
+        
+    results = calculate_gas_costs(gas_units, currencies)
     
     if json_output:
-        print(json.dumps(results, indent=2))
+        # Transform the results for JSON output
+        json_results = {}
+        for network, data in results.items():
+            if "error" in data:
+                json_results[network] = {"error": data["error"]}
+                continue
+                
+            json_results[network] = {
+                "gas_price_gwei": data["gas_price_gwei"],
+                "native_token_cost": data["native_token_cost"],
+                "native_token": data["native_token"],
+                "native_token_symbol": data["native_token_symbol"],
+                "gas_units": data["gas_units"],
+                "block_number": data["block_number"],
+                "timestamp": data["timestamp"],
+                "datetime": data["datetime"],
+                "rpc_url": data["rpc_url"],
+                "costs": data["costs"],
+                "token_prices": data["token_prices"]
+            }
+        print(json.dumps(json_results, indent=2))
         return
         
-    print(f"\nGas Costs in USD (for {gas_units}M gas units):")
+    print(f"\nGas Costs (for {gas_units}M gas units):")
     print("-" * 80)
     for network, data in results.items():
         if "error" in data:
@@ -66,10 +101,19 @@ def print_gas_costs_usd(gas_units: float = 1.0, json_output: bool = False):
             continue
             
         print(f"{network}:")
-        print(f"  Gas Price: {data['gas_price_gwei']:.2f} gwei")
-        print(f"  Native Token Cost: {data['native_token_cost']:.8f}")
-        print(f"  USD Cost: ${data['usd_cost']:.2f}")
-        print(f"  Token Price: ${data['token_price_usd']:.2f}")
+        print(f"  Gas Price: {data['gas_price_gwei']:.5f} gwei")
+        print(f"  Native Token: {data['native_token']} ({data['native_token_symbol']})")
+        print(f"  Native Token Cost: {data['native_token_cost']:.8f} {data['native_token_symbol']}")
+        
+        # Print costs in each currency
+        for currency in currencies:
+            symbol = get_currency_symbol(currency)
+            name = get_currency_name(currency)
+            cost = data["costs"][normalize_currency(currency)]
+            price = data["token_prices"][normalize_currency(currency)]
+            print(f"  {name} Cost: {symbol}{cost:.5f}")
+            print(f"  Token Price ({name}): {symbol}{price:.5f}")
+            
         print(f"  Block Number: {data['block_number']}")
         print(f"  RPC URL: {data['rpc_url']}")
         print(f"  Timestamp: {data['timestamp']}")
@@ -77,38 +121,53 @@ def print_gas_costs_usd(gas_units: float = 1.0, json_output: bool = False):
         print()
 
 def main():
-    parser = argparse.ArgumentParser(description="EVM Network Gas Price Monitor")
-    subparsers = parser.add_subparsers(dest="command", help="Command to run")
+    parser = argparse.ArgumentParser(
+        description="EVM Network Gas Price Monitor",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=f"""
+Supported Networks:
+{format_network_help()}
+
+Supported Currencies:
+{format_currency_help()}
+
+By default, shows gas costs in USD for all networks. Use optional flags to show
+specific information types. If multiple flags are provided, shows default output.
+"""
+    )
     
-    # Gas prices command
-    gas_parser = subparsers.add_parser("gas", help="Show gas prices")
-    gas_parser.add_argument("--units", type=float, default=1.0,
-                          help="Number of million gas units to calculate for (default: 1.0)")
-    gas_parser.add_argument("--json", action="store_true",
-                          help="Output in JSON format")
-    
-    # Crypto prices command
-    crypto_parser = subparsers.add_parser("crypto", help="Show cryptocurrency prices")
-    crypto_parser.add_argument("--json", action="store_true",
-                             help="Output in JSON format")
-    
-    # Unit cost command
-    unit_parser = subparsers.add_parser("unit", help="Show gas costs in USD")
-    unit_parser.add_argument("--units", type=float, default=1.0,
-                           help="Number of million gas units to calculate for (default: 1.0)")
-    unit_parser.add_argument("--json", action="store_true",
-                           help="Output in JSON format")
+    parser.add_argument("--gas-prices", action="store_true",
+                       help="Show gas prices for all networks")
+    parser.add_argument("--currency-prices", action="store_true",
+                       help="Show cryptocurrency prices")
+    parser.add_argument("--units", type=float, default=1.0,
+                       help="Number of million gas units to calculate for (default: 1.0)")
+    parser.add_argument("--currencies", nargs="+", default=["USD"],
+                       help="Currencies to show prices in (default: USD)")
+    parser.add_argument("--json", action="store_true",
+                       help="Output in JSON format")
     
     args = parser.parse_args()
     
-    if args.command == "gas":
-        print_gas_prices(args.units, args.json)
-    elif args.command == "crypto":
-        print_crypto_prices(args.json)
-    elif args.command == "unit":
-        print_gas_costs_usd(args.units, args.json)
+    # Validate currencies
+    if "all" not in args.currencies:
+        # Normalize currencies for validation
+        normalized_currencies = [normalize_currency(c) for c in args.currencies]
+        invalid_currencies = [c for c in normalized_currencies if c not in SUPPORTED_CURRENCIES]
+        if invalid_currencies:
+            print(f"Error: Unsupported currencies: {', '.join(invalid_currencies)}")
+            print(f"Supported currencies: {', '.join(SUPPORTED_CURRENCIES.keys())}")
+            return
+    
+    # If no specific output type is requested, or if multiple are requested,
+    # show the default combined output
+    if not (args.gas_prices or args.currency_prices) or (args.gas_prices and args.currency_prices):
+        print_gas_costs(args.units, args.currencies, args.json)
     else:
-        parser.print_help()
+        if args.gas_prices:
+            print_gas_prices(args.units, args.json)
+        if args.currency_prices:
+            print_crypto_prices(args.currencies, args.json)
 
 if __name__ == "__main__":
     main() 

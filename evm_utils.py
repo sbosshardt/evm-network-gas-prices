@@ -1,44 +1,19 @@
+"""Core utilities for the EVM gas price monitor."""
+
 from web3 import Web3
-import requests
-from datetime import datetime
-import time
-import random
 import asyncio
 import aiohttp
-from typing import Dict, Union
+from datetime import datetime
+import time
+from typing import Dict, Union, List
 from decimal import Decimal, ROUND_DOWN
 
-# Define RPC endpoints with fallbacks
-RPC_ENDPOINTS = {
-    "Ethereum Mainnet": [
-        "https://eth.merkle.io",
-        "https://eth-mainnet.public.blastapi.io",
-        "https://ethereum.publicnode.com"
-    ],
-    "Arbitrum One": [
-        "https://arb1.arbitrum.io/rpc",
-        "https://arbitrum-one.public.blastapi.io",
-        "https://arbitrum.llamarpc.com"
-    ],
-    "Gnosis": [
-        "https://rpc.gnosis.gateway.fm",
-        "https://gnosis.public.blastapi.io",
-        "https://gnosis.llamarpc.com"
-    ],
-    "Polygon": [
-        "https://polygon-rpc.com",
-        "https://polygon.public.blastapi.io",
-        "https://polygon.llamarpc.com"
-    ],
-    "Fantom": [
-        "https://fantom-pokt.nodies.app",
-        "https://fantom.public.blastapi.io",
-        "https://fantom.llamarpc.com"
-    ]
-}
-
-# Track last used endpoint for each network
-last_used_endpoints = {network: None for network in RPC_ENDPOINTS.keys()}
+from networks import RPC_ENDPOINTS, get_network_info
+from currencies import (
+    SUPPORTED_CURRENCIES, DEFAULT_CURRENCY,
+    get_currency_symbol, get_currency_name, get_all_currencies,
+    normalize_currency
+)
 
 DEFAULT_GAS_UNITS = 1_000_000  # 1 million gas units
 
@@ -54,20 +29,6 @@ def get_current_timestamps() -> Dict[str, Union[int, str]]:
         "datetime": now.strftime("%Y-%m-%d %H:%M:%S %Z")
     }
 
-def get_random_endpoint(network: str) -> str:
-    """Get a random endpoint for a network, avoiding the last used one if possible."""
-    endpoints = RPC_ENDPOINTS[network]
-    if len(endpoints) == 1:
-        return endpoints[0]
-    
-    available_endpoints = [ep for ep in endpoints if ep != last_used_endpoints[network]]
-    if not available_endpoints:
-        available_endpoints = endpoints
-    
-    endpoint = random.choice(available_endpoints)
-    last_used_endpoints[network] = endpoint
-    return endpoint
-
 async def fetch_network_data(network: str, gas_units: int, timestamps: Dict[str, Union[int, str]]) -> Dict:
     """Fetch data for a single network, retrying with different endpoints if one fails."""
     endpoints = RPC_ENDPOINTS[network]
@@ -82,13 +43,14 @@ async def fetch_network_data(network: str, gas_units: int, timestamps: Dict[str,
             total_cost_wei = gas_price * gas_units
             native_token_cost = wei_to_eth(total_cost_wei)
             
-            # Update last used endpoint only on success
-            last_used_endpoints[network] = endpoint
+            network_info = get_network_info(network)
             
             return {
                 "gas_price_gwei": float(Web3.from_wei(gas_price, 'gwei')),
                 "total_cost_wei": total_cost_wei,
                 "native_token_cost": native_token_cost,
+                "native_token": network_info["native_token"],
+                "native_token_symbol": network_info["native_token_symbol"],
                 "gas_units": gas_units,
                 "block_number": block_number,
                 "timestamp": timestamps["timestamp"],
@@ -123,12 +85,20 @@ def get_gas_prices(gas_units: float = 1.0) -> Dict[str, Dict[str, Union[float, i
     """Get gas prices for all networks."""
     return asyncio.run(get_gas_prices_async(gas_units))
 
-async def get_crypto_prices_async() -> Dict[str, Dict[str, Union[float, int, str]]]:
+async def get_crypto_prices_async(currencies: List[str] = None) -> Dict[str, Dict[str, Union[float, int, str]]]:
     """Get cryptocurrency prices from CoinGecko asynchronously."""
+    if currencies is None:
+        currencies = [DEFAULT_CURRENCY]
+    elif "all" in currencies:
+        currencies = get_all_currencies()
+    
+    # Convert currencies to lowercase for API call
+    api_currencies = [c.lower() for c in currencies]
+    
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
-        "ids": "ethereum,fantom,matic-network,xdai",
-        "vs_currencies": "usd"
+        "ids": "ethereum,fantom,matic-network,xdai,avalanche-2,binancecoin,optimism,base",
+        "vs_currencies": ",".join(api_currencies)
     }
     
     try:
@@ -136,7 +106,7 @@ async def get_crypto_prices_async() -> Dict[str, Dict[str, Union[float, int, str
             async with session.get(url, params=params) as response:
                 response.raise_for_status()
                 data = await response.json()
-
+                
                 # Add timestamps
                 timestamps = get_current_timestamps()
                 data['timestamp'] = timestamps["timestamp"]
@@ -146,15 +116,23 @@ async def get_crypto_prices_async() -> Dict[str, Dict[str, Union[float, int, str
     except Exception as e:
         return {"error": str(e)}
 
-def get_crypto_prices() -> Dict[str, Dict[str, Union[float, int, str]]]:
+def get_crypto_prices(currencies: List[str] = None) -> Dict[str, Dict[str, Union[float, int, str]]]:
     """Get cryptocurrency prices."""
-    return asyncio.run(get_crypto_prices_async())
+    return asyncio.run(get_crypto_prices_async(currencies))
 
-async def calculate_gas_costs_usd_async(gas_units: float = 1.0) -> Dict[str, Dict[str, Union[float, int, str]]]:
-    """Calculate gas costs in USD for all networks asynchronously."""
+async def calculate_gas_costs_async(gas_units: float = 1.0, currencies: List[str] = None) -> Dict[str, Dict[str, Union[float, int, str]]]:
+    """Calculate gas costs in specified currencies for all networks asynchronously."""
+    if currencies is None:
+        currencies = [DEFAULT_CURRENCY]
+    elif "all" in currencies:
+        currencies = get_all_currencies()
+    
+    # Normalize currencies to uppercase for display
+    currencies = [normalize_currency(c) for c in currencies]
+    
     # Fetch gas prices and crypto prices concurrently
     gas_prices_task = get_gas_prices_async(gas_units)
-    crypto_prices_task = get_crypto_prices_async()
+    crypto_prices_task = get_crypto_prices_async(currencies)
     
     gas_prices, crypto_prices = await asyncio.gather(gas_prices_task, crypto_prices_task)
     
@@ -167,40 +145,40 @@ async def calculate_gas_costs_usd_async(gas_units: float = 1.0) -> Dict[str, Dic
             results[network] = {"error": gas_data["error"]}
             continue
             
-        # Map networks to their native tokens
-        token_map = {
-            "Ethereum Mainnet": "ethereum",
-            "Fantom": "fantom",
-            "Gnosis": "xdai",
-            "Polygon": "matic-network",
-            "Arbitrum One": "ethereum"
-        }
+        network_info = get_network_info(network)
+        token = network_info["coingecko_id"]
         
-        token = token_map.get(network)
-        if not token:
-            results[network] = {"error": "Unknown token mapping"}
-            continue
+        # Calculate costs in each currency
+        costs = {}
+        token_prices = {}
+        for currency in currencies:
+            # Use lowercase for API data lookup
+            token_price = crypto_prices[token][currency.lower()]
+            cost = gas_data["native_token_cost"] * token_price
             
-        token_price = crypto_prices[token]["usd"]
-        usd_cost = gas_data["native_token_cost"] * token_price
-        
-        # Use Decimal for more precise calculations
-        usd_cost_decimal = Decimal(str(usd_cost)).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+            # Use Decimal for more precise calculations
+            cost_decimal = Decimal(str(cost)).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+            token_price_decimal = Decimal(str(token_price)).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+            
+            costs[currency] = float(cost_decimal)
+            token_prices[currency] = float(token_price_decimal)
         
         results[network] = {
             "gas_price_gwei": gas_data["gas_price_gwei"],
             "native_token_cost": gas_data["native_token_cost"],
-            "usd_cost": float(usd_cost_decimal),
-            "token_price_usd": token_price,
+            "native_token": gas_data["native_token"],
+            "native_token_symbol": gas_data["native_token_symbol"],
             "gas_units": gas_data["gas_units"],
             "block_number": gas_data["block_number"],
             "timestamp": gas_data["timestamp"],
             "datetime": gas_data["datetime"],
-            "rpc_url": gas_data["rpc_url"]
+            "rpc_url": gas_data["rpc_url"],
+            "costs": costs,
+            "token_prices": token_prices
         }
     
     return results
 
-def calculate_gas_costs_usd(gas_units: float = 1.0) -> Dict[str, Dict[str, Union[float, int, str]]]:
-    """Calculate gas costs in USD for all networks."""
-    return asyncio.run(calculate_gas_costs_usd_async(gas_units)) 
+def calculate_gas_costs(gas_units: float = 1.0, currencies: List[str] = None) -> Dict[str, Dict[str, Union[float, int, str]]]:
+    """Calculate gas costs in specified currencies for all networks."""
+    return asyncio.run(calculate_gas_costs_async(gas_units, currencies)) 
