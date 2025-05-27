@@ -26,7 +26,7 @@ A Python tool to monitor gas prices across various EVM-compatible networks and t
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/evm-network-gas-prices.git
+git clone https://github.com/sbosshardt/evm-network-gas-prices.git
 cd evm-network-gas-prices
 ```
 
