@@ -10,9 +10,9 @@ from decimal import Decimal, ROUND_DOWN
 
 from networks import RPC_ENDPOINTS, get_network_info
 from currencies import (
-    SUPPORTED_CURRENCIES, DEFAULT_CURRENCY,
+    SUPPORTED_CURRENCIES,
     get_currency_symbol, get_currency_name, get_all_currencies,
-    normalize_currency
+    normalize_currency, get_locale_currency
 )
 
 DEFAULT_GAS_UNITS = 1_000_000  # 1 million gas units
@@ -88,7 +88,7 @@ def get_gas_prices(gas_units: float = 1.0) -> Dict[str, Dict[str, Union[float, i
 async def get_crypto_prices_async(currencies: List[str] = None) -> Dict[str, Dict[str, Union[float, int, str]]]:
     """Get cryptocurrency prices from CoinGecko asynchronously."""
     if currencies is None:
-        currencies = [DEFAULT_CURRENCY]
+        currencies = [get_locale_currency()]
     elif "all" in currencies:
         currencies = get_all_currencies()
     
@@ -123,7 +123,7 @@ def get_crypto_prices(currencies: List[str] = None) -> Dict[str, Dict[str, Union
 async def calculate_gas_costs_async(gas_units: float = 1.0, currencies: List[str] = None) -> Dict[str, Dict[str, Union[float, int, str]]]:
     """Calculate gas costs in specified currencies for all networks asynchronously."""
     if currencies is None:
-        currencies = [DEFAULT_CURRENCY]
+        currencies = [get_locale_currency()]
     elif "all" in currencies:
         currencies = get_all_currencies()
     

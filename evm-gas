@@ -9,7 +9,8 @@ from networks import RPC_ENDPOINTS, format_network_help
 from currencies import (
     SUPPORTED_CURRENCIES, format_currency_help,
     get_currency_symbol, get_currency_name,
-    normalize_currency
+    normalize_currency, format_number,
+    get_locale_currency, get_all_currencies
 )
 
 def print_gas_prices(gas_units: float = 1.0, json_output: bool = False):
@@ -20,7 +21,7 @@ def print_gas_prices(gas_units: float = 1.0, json_output: bool = False):
         print(json.dumps(results, indent=2))
         return
         
-    print(f"\nGas Prices (for {gas_units}M gas units):")
+    print(f"\nGas Prices (for {format_number(gas_units)}M gas units):")
     print("-" * 80)
     for network, data in results.items():
         if "error" in data:
@@ -28,10 +29,10 @@ def print_gas_prices(gas_units: float = 1.0, json_output: bool = False):
             continue
             
         print(f"{network}:")
-        print(f"  Gas Price: {data['gas_price_gwei']:.5f} gwei")
-        print(f"  Total Cost: {data['native_token_cost']:.8f} {data['native_token_symbol']}")
+        print(f"  Gas Price: {format_number(data['gas_price_gwei'], 5)} gwei")
+        print(f"  Total Cost: {format_number(data['native_token_cost'], 8)} {data['native_token_symbol']}")
         print(f"  Native Token: {data['native_token']} ({data['native_token_symbol']})")
-        print(f"  Block Number: {data['block_number']}")
+        print(f"  Block Number: {format_number(data['block_number'])}")
         print(f"  RPC URL: {data['rpc_url']}")
         print(f"  Timestamp: {data['timestamp']}")
         print(f"  As of: {data['datetime']}")
@@ -58,14 +59,16 @@ def print_crypto_prices(currencies: list, json_output: bool = False):
         for currency in currencies:
             symbol = get_currency_symbol(currency)
             name = get_currency_name(currency)
-            print(f"  {name}: {symbol}{prices[currency]:.5f}")
+            print(f"  {name}: {symbol}{format_number(prices[currency], 5)}")
     print(f"\nTimestamp: {results['timestamp']}")
     print(f"As of: {results['datetime']}")
 
 def print_gas_costs(gas_units: float = 1.0, currencies: list = None, json_output: bool = False):
     """Print gas costs in specified currencies for all networks."""
     if currencies is None:
-        currencies = ["usd"]
+        currencies = [get_locale_currency()]
+    elif "all" in currencies:
+        currencies = get_all_currencies()
         
     results = calculate_gas_costs(gas_units, currencies)
     
@@ -93,7 +96,7 @@ def print_gas_costs(gas_units: float = 1.0, currencies: list = None, json_output
         print(json.dumps(json_results, indent=2))
         return
         
-    print(f"\nGas Costs (for {gas_units}M gas units):")
+    print(f"\nGas Costs (for {format_number(gas_units)}M gas units):")
     print("-" * 80)
     for network, data in results.items():
         if "error" in data:
@@ -101,20 +104,23 @@ def print_gas_costs(gas_units: float = 1.0, currencies: list = None, json_output
             continue
             
         print(f"{network}:")
-        print(f"  Gas Price: {data['gas_price_gwei']:.5f} gwei")
+        print(f"  Gas Price: {format_number(data['gas_price_gwei'], 5)} gwei")
         print(f"  Native Token: {data['native_token']} ({data['native_token_symbol']})")
-        print(f"  Native Token Cost: {data['native_token_cost']:.8f} {data['native_token_symbol']}")
+        print(f"  Native Token Cost: {format_number(data['native_token_cost'], 8)} {data['native_token_symbol']}")
         
         # Print costs in each currency
         for currency in currencies:
+            normalized = normalize_currency(currency)
+            if normalized == "all":
+                continue
             symbol = get_currency_symbol(currency)
             name = get_currency_name(currency)
-            cost = data["costs"][normalize_currency(currency)]
-            price = data["token_prices"][normalize_currency(currency)]
-            print(f"  {name} Cost: {symbol}{cost:.5f}")
-            print(f"  Token Price ({name}): {symbol}{price:.5f}")
+            cost = data["costs"][normalized]
+            price = data["token_prices"][normalized]
+            print(f"  {name} Cost: {symbol}{format_number(cost)}")
+            print(f"  Token Price ({name}): {symbol}{format_number(price)}")
             
-        print(f"  Block Number: {data['block_number']}")
+        print(f"  Block Number: {format_number(data['block_number'])}")
         print(f"  RPC URL: {data['rpc_url']}")
         print(f"  Timestamp: {data['timestamp']}")
         print(f"  As of: {data['datetime']}")
@@ -131,8 +137,9 @@ Supported Networks:
 Supported Currencies:
 {format_currency_help()}
 
-By default, shows gas costs in USD for all networks. Use optional flags to show
-specific information types. If multiple flags are provided, shows default output.
+By default, shows gas costs in your locale's currency (or all currencies if not supported).
+Use optional flags to show specific information types. If multiple flags are provided,
+shows default output.
 """
     )
     
@@ -142,8 +149,8 @@ specific information types. If multiple flags are provided, shows default output
                        help="Show cryptocurrency prices")
     parser.add_argument("--units", type=float, default=1.0,
                        help="Number of million gas units to calculate for (default: 1.0)")
-    parser.add_argument("--currencies", nargs="+", default=["USD"],
-                       help="Currencies to show prices in (default: USD)")
+    parser.add_argument("--currencies", nargs="+", default=[get_locale_currency()],
+                       help="Currencies to show prices in (default: locale currency or 'all')")
     parser.add_argument("--json", action="store_true",
                        help="Output in JSON format")
     
