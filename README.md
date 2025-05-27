@@ -1,26 +1,24 @@
-# EVM Network Gas Prices
+# EVM Network Gas Price Monitor
 
-A Python tool to monitor gas prices across various EVM-compatible networks and track cryptocurrency prices. This tool helps users make informed decisions about transaction costs across different networks.
+A command-line tool for monitoring gas prices across multiple EVM networks. The tool provides real-time gas price data, native token costs, and USD (or other currency) costs for transactions.
 
 ## Features
 
-- Real-time gas price monitoring for multiple EVM networks:
-  - Ethereum Mainnet
-  - Arbitrum One
-  - Gnosis
+- Monitor gas prices across multiple EVM networks:
+  - Ethereum
   - Polygon
+  - Arbitrum
+  - Avalanche
+  - Base
+  - BSC (Binance Smart Chain)
   - Fantom
-- Cryptocurrency price tracking for:
-  - ETH/USD
-  - FTM/USD
-  - xDAI (pegged to USD)
-- Calculates transaction costs for 1M gas units
-- Displays prices in both native tokens and USD
-
-## Prerequisites
-
-- Python 3.8 or higher
-- pip (Python package installer)
+  - Linea
+  - Optimism
+- View gas prices in multiple currencies (USD, EUR, GBP, JPY, CNY, INR, KRW, BTC, ETH, BNB)
+- Locale-aware number formatting
+- Multiple RPC endpoints per network with automatic fallback
+- JSON output support
+- Asynchronous data fetching for better performance
 
 ## Installation
 
@@ -31,17 +29,9 @@ cd evm-network-gas-prices
 ```
 
 2. Create and activate a virtual environment:
-
-### Linux/macOS
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### Windows
 ```bash
 python -m venv venv
-.\venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 3. Install dependencies:
@@ -49,66 +39,128 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
+4. Make the script executable:
+```bash
+chmod +x evm-gas
+```
+
 ## Usage
 
-### Running Gas Price Monitor
+The tool provides several ways to view gas price information:
+
+### Basic Usage
+
+Show gas costs in your locale's currency (or all currencies if not supported):
 ```bash
-python gas-prices.py
+./evm-gas
 ```
-This will display current gas prices and estimated transaction costs for 1M gas units across all supported networks.
 
-### Running Cryptocurrency Price Tracker
+### Command Options
+
+- `--gas-prices`: Show only gas prices for all networks
+- `--currency-prices`: Show only cryptocurrency prices
+- `--units <number>`: Specify number of million gas units to calculate for (default: 1.0)
+- `--currencies <list>`: Specify currencies to show prices in
+- `--json`: Output in JSON format
+
+### Examples
+
+Show gas prices in USD:
 ```bash
-python cryptocurrency-prices.py
-```
-This will show current prices for ETH, FTM, and xDAI in USD.
-
-## Output Examples
-
-### Gas Prices Output
-```
---- Ethereum Mainnet ---
-Gas Price: 25.5 gwei
-Tx Cost for 1M gas: 25500000000000 wei (0.025500 native token)
-
---- Arbitrum One ---
-Gas Price: 0.1 gwei
-Tx Cost for 1M gas: 100000000000 wei (0.000100 native token)
+./evm-gas --currencies USD
 ```
 
-### Cryptocurrency Prices Output
-```
-Cryptocurrency Prices (2024-03-21 15:30:45):
-----------------------------------------
-ETH:  $3,500.25 USD
-FTM:  $0.45 USD
-xDAI: $1.00 USD (pegged)
+Show gas prices in multiple currencies:
+```bash
+./evm-gas --currencies USD EUR GBP
 ```
 
-## Configuration
-
-The RPC endpoints are configured in `gas-prices.py`. You can modify the `RPC_ENDPOINTS` dictionary to add or remove networks:
-
-```python
-RPC_ENDPOINTS = {
-    "Ethereum Mainnet": "https://eth.merkle.io",
-    "Arbitrum One": "https://arb1.arbitrum.io/rpc",
-    "Gnosis": "https://rpc.gnosis.gateway.fm",
-    "Polygon": "https://polygon-rpc.com",
-    "Fantom": "https://rpc.fantom.foundation",
-}
+Show gas prices in all supported currencies:
+```bash
+./evm-gas --currencies all
 ```
 
-## Troubleshooting
+Show only gas prices (no USD costs):
+```bash
+./evm-gas --gas-prices
+```
 
-1. If you encounter connection errors:
-   - Check your internet connection
-   - Verify that the RPC endpoints are accessible
-   - Try using alternative RPC endpoints
+Show only cryptocurrency prices:
+```bash
+./evm-gas --currency-prices
+```
 
-2. If you get Python package errors:
-   - Ensure you're in the virtual environment
-   - Try reinstalling dependencies: `pip install -r requirements.txt --upgrade`
+Calculate costs for 2 million gas units:
+```bash
+./evm-gas --units 2.0
+```
+
+Get output in JSON format:
+```bash
+./evm-gas --json
+```
+
+### Output Format
+
+The tool provides detailed output including:
+- Gas price in gwei
+- Native token cost
+- Costs in specified currencies
+- Token prices in specified currencies
+- Block number
+- RPC URL used
+- Timestamp and datetime
+
+Example output:
+```
+Gas Costs (for 1M gas units):
+--------------------------------------------------------------------------------
+Ethereum:
+  Gas Price: 20.12345 gwei
+  Native Token: Ethereum (ETH)
+  Native Token Cost: 0.00040247 ETH
+  USD Cost: $2,592.34
+  Token Price (USD): $2,592.34
+  Block Number: 19,123,456
+  RPC URL: https://eth-mainnet.g.alchemy.com/v2/...
+  Timestamp: 1710864000
+  As of: 2024-03-19 12:00:00 UTC
+```
+
+### Number Formatting
+
+The tool uses locale-aware number formatting:
+- Integers show no decimal places
+- Numbers greater than 1 show 2 decimal places
+- Numbers less than 1 show 5 significant figures
+- Thousands separators are added according to locale
+
+### Supported Networks
+
+The tool supports the following networks:
+- Ethereum
+- Polygon
+- Arbitrum
+- Avalanche
+- Base
+- BSC (Binance Smart Chain)
+- Fantom
+- Linea
+- Optimism
+
+### Supported Currencies
+
+The tool supports the following currencies:
+- USD (US Dollar, $)
+- EUR (Euro, €)
+- GBP (British Pound, £)
+- JPY (Japanese Yen, ¥)
+- CNY (Chinese Yuan, ¥)
+- INR (Indian Rupee, ₹)
+- KRW (South Korean Won, ₩)
+- BTC (Bitcoin, ₿)
+- ETH (Ethereum, Ξ)
+- BNB (Binance Coin, BNB)
 
 ## Contributing
 
