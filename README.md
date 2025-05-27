@@ -61,7 +61,7 @@ This will display current gas prices and estimated transaction costs for 1M gas 
 ```bash
 python cryptocurrency-prices.py
 ```
-This will show current prices for ETH, FTM, and xDAI in both USD and USDC.
+This will show current prices for ETH, FTM, and xDAI in USD.
 
 ## Output Examples
 
@@ -83,12 +83,6 @@ Cryptocurrency Prices (2024-03-21 15:30:45):
 ETH:  $3,500.25 USD
 FTM:  $0.45 USD
 xDAI: $1.00 USD (pegged)
-
-USDC Prices:
-----------------------------------------
-ETH:  3,500.25 USDC
-FTM:  0.45 USDC
-xDAI: 1.00 USDC (pegged)
 ```
 
 ## Configuration
