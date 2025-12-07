@@ -174,10 +174,15 @@ async def calculate_gas_costs_async(gas_units: float = 1.0, currencies: List[str
         token_prices = {}
         for currency in currencies:
             # Use lowercase for API data lookup
-            token_price = crypto_prices[token][currency.lower()]
+            token_data = crypto_prices.get(token, {})
+            if not token_data or currency.lower() not in token_data:
+                # Skip this currency/token combination if price data is unavailable
+                continue
+
+            token_price = token_data[currency.lower()]
             token_price_decimal = Decimal(str(token_price)).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
             token_prices[currency] = float(token_price_decimal)
-            
+
             # Calculate costs for each percentile
             costs[currency] = {}
             for percentile in ["10", "50", "90"]:
