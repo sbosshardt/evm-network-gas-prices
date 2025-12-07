@@ -118,7 +118,7 @@ async def get_crypto_prices_async(currencies: List[str] = None) -> Dict[str, Dic
     
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
-        "ids": "ethereum,fantom,matic-network,xdai,avalanche-2,binancecoin,optimism,base",
+        "ids": "ethereum,fantom,polygon-ecosystem-token,xdai,avalanche-2,binancecoin,optimism,base",
         "vs_currencies": ",".join(api_currencies)
     }
     

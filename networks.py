@@ -44,9 +44,9 @@ NETWORKS: Dict[str, NetworkInfo] = {
     },
     "Polygon": {
         "name": "Polygon",
-        "native_token": "Matic",
-        "native_token_symbol": "MATIC",
-        "coingecko_id": "matic-network"
+        "native_token": "Polygon",
+        "native_token_symbol": "POL",
+        "coingecko_id": "polygon-ecosystem-token"
     },
     "Avalanche": {
         "name": "Avalanche",
@@ -139,7 +139,7 @@ TOKEN_MAP = {
     "Base": "ethereum",
     "Fantom": "fantom",
     "Gnosis": "xdai",
-    "Polygon": "matic-network",
+    "Polygon": "polygon-ecosystem-token",
     "Avalanche": "avalanche-2",
     "BSC": "binancecoin",
     "Linea": "ethereum"
