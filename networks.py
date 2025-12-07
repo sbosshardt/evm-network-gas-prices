@@ -71,7 +71,13 @@ NETWORKS: Dict[str, NetworkInfo] = {
         "native_token": "Ether",
         "native_token_symbol": "ETH",
         "coingecko_id": "ethereum"
-    }
+    },
+    "Shardeum Mainnet": {
+        "name": "Shardeum",
+        "native_token": "Shardeum",
+        "native_token_symbol": "SHM",
+        "coingecko_id": "shardeum"
+    },
 }
 
 # Define RPC endpoints with fallbacks
@@ -125,6 +131,9 @@ RPC_ENDPOINTS: Dict[str, List[str]] = {
         "https://rpc.linea.build",
         "https://linea.public.blastapi.io",
         "https://linea.llamarpc.com"
+    ],
+    "Shardeum Mainnet": [
+        "https://api.shardeum.org",
     ]
 }
 
@@ -142,7 +151,8 @@ TOKEN_MAP = {
     "Polygon": "polygon-ecosystem-token",
     "Avalanche": "avalanche-2",
     "BSC": "binancecoin",
-    "Linea": "ethereum"
+    "Linea": "ethereum",
+    "Shardeum Mainnet": "shardeum"
 }
 
 def get_random_endpoint(network: str) -> str:
